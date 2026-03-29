@@ -9,105 +9,159 @@ class TapparellaCardEditor extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    this._config = {};
+    this._built = false;
   }
 
   setConfig(config) {
-    this._config = config;
-    this._render();
-  }
-
-  _render() {
-    const c = this._config || {};
-    const accent = c.color || '#6366f1';
-
-    this.shadowRoot.innerHTML = `
-      <style>
-        :host { display: block; }
-        .form { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; }
-        label { font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; display: block; }
-        ha-entity-picker, ha-textfield, ha-select { width: 100%; }
-        .color-row { display: flex; align-items: center; gap: 12px; }
-        .color-row input[type=color] {
-          width: 44px; height: 44px; border-radius: 12px; border: 2px solid #e5e7eb;
-          cursor: pointer; padding: 2px; background: none;
-        }
-        .color-hint { font-size: 12px; color: #9ca3af; }
-        .section-title {
-          font-size: 11px; font-weight: 700; color: #9ca3af;
-          text-transform: uppercase; letter-spacing: 0.1em;
-          border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;
-          margin-top: 4px;
-        }
-      </style>
-      <div class="form">
-        <div class="section-title">Entità</div>
-
-        <div>
-          <label>Cover (obbligatoria)</label>
-          <ha-entity-picker
-            .hass="${this._hass}"
-            .value="${c.entity || ''}"
-            .includeDomains="${['cover']}"
-            allow-custom-entity
-            @value-changed="${e => this._valueChanged('entity', e.detail.value)}"
-          ></ha-entity-picker>
-        </div>
-
-        <div>
-          <label>Sensore Energia (opzionale)</label>
-          <ha-entity-picker
-            .hass="${this._hass}"
-            .value="${c.energy_entity || ''}"
-            .includeDomains="${['sensor']}"
-            allow-custom-entity
-            @value-changed="${e => this._valueChanged('energy_entity', e.detail.value)}"
-          ></ha-entity-picker>
-        </div>
-
-        <div class="section-title">Aspetto</div>
-
-        <div>
-          <label>Nome stanza</label>
-          <ha-textfield
-            .value="${c.name || ''}"
-            placeholder="Es. Soggiorno"
-            @input="${e => this._valueChanged('name', e.target.value)}"
-          ></ha-textfield>
-        </div>
-
-        <div>
-          <label>Colore tema</label>
-          <div class="color-row">
-            <input
-              type="color"
-              .value="${accent}"
-              @input="${e => this._valueChanged('color', e.target.value)}"
-            />
-            <span class="color-hint">Colore principale bottoni e icone</span>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // Passa hass all'entity-picker dopo il render
-    if (this._hass) {
-      this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p => {
-        p.hass = this._hass;
-      });
+    this._config = { ...config };
+    if (this._built) {
+      this._syncValues();
     }
   }
 
   set hass(hass) {
     this._hass = hass;
+    if (!this._built) {
+      this._build();
+    }
+    // Propaga hass agli entity-picker ogni volta
     this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p => {
       p.hass = hass;
     });
   }
 
-  _valueChanged(key, value) {
+  _build() {
+    this._built = true;
+    const root = this.shadowRoot;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      :host { display: block; }
+      .form { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; }
+      .section-title {
+        font-size: 11px; font-weight: 700; color: #9ca3af;
+        text-transform: uppercase; letter-spacing: 0.1em;
+        border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;
+        margin-top: 4px;
+      }
+      label {
+        font-size: 12px; font-weight: 600; color: #6b7280;
+        text-transform: uppercase; letter-spacing: 0.05em;
+        margin-bottom: 4px; display: block;
+      }
+      ha-entity-picker, ha-textfield { display: block; width: 100%; }
+      .color-row { display: flex; align-items: center; gap: 12px; }
+      .color-row input[type=color] {
+        width: 44px; height: 44px; border-radius: 12px;
+        border: 2px solid #e5e7eb; cursor: pointer;
+        padding: 2px; background: none;
+      }
+      .color-hint { font-size: 12px; color: #9ca3af; }
+    `;
+    root.appendChild(style);
+
+    const form = document.createElement('div');
+    form.className = 'form';
+
+    // ── Sezione Entità ──
+    const secEntita = document.createElement('div');
+    secEntita.className = 'section-title';
+    secEntita.textContent = 'Entità';
+    form.appendChild(secEntita);
+
+    // Cover picker
+    form.appendChild(this._makePickerField(
+      'Cover (obbligatoria)', 'entity', ['cover']
+    ));
+
+    // Energia picker
+    form.appendChild(this._makePickerField(
+      'Sensore Energia (opzionale)', 'energy_entity', ['sensor']
+    ));
+
+    // ── Sezione Aspetto ──
+    const secAspetto = document.createElement('div');
+    secAspetto.className = 'section-title';
+    secAspetto.textContent = 'Aspetto';
+    form.appendChild(secAspetto);
+
+    // Nome stanza
+    const nomeWrap = document.createElement('div');
+    const nomeLabel = document.createElement('label');
+    nomeLabel.textContent = 'Nome stanza';
+    const nomeField = document.createElement('ha-textfield');
+    nomeField.setAttribute('placeholder', 'Es. Soggiorno');
+    nomeField.style.width = '100%';
+    nomeField.addEventListener('input', e => this._changed('name', e.target.value));
+    nomeField.addEventListener('change', e => this._changed('name', e.target.value));
+    this._nomeField = nomeField;
+    nomeWrap.appendChild(nomeLabel);
+    nomeWrap.appendChild(nomeField);
+    form.appendChild(nomeWrap);
+
+    // Colore
+    const colorWrap = document.createElement('div');
+    const colorLabel = document.createElement('label');
+    colorLabel.textContent = 'Colore tema';
+    const colorRow = document.createElement('div');
+    colorRow.className = 'color-row';
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.addEventListener('input', e => this._changed('color', e.target.value));
+    const colorHint = document.createElement('span');
+    colorHint.className = 'color-hint';
+    colorHint.textContent = 'Colore principale bottoni e icone';
+    colorRow.appendChild(colorInput);
+    colorRow.appendChild(colorHint);
+    this._colorInput = colorInput;
+    colorWrap.appendChild(colorLabel);
+    colorWrap.appendChild(colorRow);
+    form.appendChild(colorWrap);
+
+    root.appendChild(form);
+    this._syncValues();
+  }
+
+  _makePickerField(labelText, key, domains) {
+    const wrap = document.createElement('div');
+    const label = document.createElement('label');
+    label.textContent = labelText;
+
+    const picker = document.createElement('ha-entity-picker');
+    picker.setAttribute('allow-custom-entity', '');
+    picker.includeDomains = domains;
+    if (this._hass) picker.hass = this._hass;
+
+    picker.addEventListener('value-changed', e => {
+      this._changed(key, e.detail.value);
+    });
+
+    // Salva riferimento per sync
+    if (key === 'entity')        this._entityPicker = picker;
+    if (key === 'energy_entity') this._energyPicker = picker;
+
+    wrap.appendChild(label);
+    wrap.appendChild(picker);
+    return wrap;
+  }
+
+  _syncValues() {
+    const c = this._config || {};
+    if (this._entityPicker) this._entityPicker.value = c.entity || '';
+    if (this._energyPicker) this._energyPicker.value = c.energy_entity || '';
+    if (this._nomeField)    this._nomeField.value    = c.name  || '';
+    if (this._colorInput)   this._colorInput.value   = c.color || '#6366f1';
+  }
+
+  _changed(key, value) {
     if (!this._config) return;
-    const newConfig = { ...this._config, [key]: value };
-    this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: newConfig } }));
+    this._config = { ...this._config, [key]: value };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: this._config },
+      bubbles: true,
+      composed: true,
+    }));
   }
 }
 
