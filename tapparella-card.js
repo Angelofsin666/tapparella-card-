@@ -148,7 +148,6 @@ class TapparellaCard extends HTMLElement {
   }
 
   setConfig(config) {
-    if (!config.entity) throw new Error('Specifica una cover entity.');
     this._config = config;
     this._render();
   }
@@ -261,7 +260,7 @@ class TapparellaCard extends HTMLElement {
           <div class="icon-wrap"><ha-icon icon="mdi:window-shutter"></ha-icon></div>
           <div class="header-text">
             <div class="room-name" id="room-name">${c.name || 'Tapparella'}</div>
-            <div class="energy" id="energy-text">${c.energy_entity ? 'Energia: --' : ''}</div>
+            <div class="energy" id="energy-text">${c.energy_entity ? 'Energia: --' : (!c.entity ? 'Seleziona una cover entity' : '')}</div>
           </div>
         </div>
         <div class="visual-panel">
@@ -311,9 +310,21 @@ class TapparellaCard extends HTMLElement {
   }
 
   _updateState() {
-    if (!this._hass || !this._config?.entity) return;
+    if (!this._hass || !this._config) return;
     const root = this.shadowRoot;
-    if (!root.getElementById('pos-number')) return;
+    if (!root.getElementById("pos-number")) return;
+    // Nessuna entity: mostra placeholder statico
+    if (!this._config.entity) {
+      const accent = this._config.color || "#6366f1";
+      const light  = this._lighten(accent);
+      const svgEl = root.getElementById("svg-container");
+      if (svgEl && !svgEl.innerHTML) svgEl.innerHTML = this._buildSvg(50, accent, light);
+      const posEl = root.getElementById("pos-number");
+      if (posEl) posEl.textContent = "--";
+      const badgeEl = root.getElementById("status-badge");
+      if (badgeEl) badgeEl.textContent = "···";
+      return;
+    }
 
     const accent = this._config.color || '#6366f1';
     const light  = this._lighten(accent);
@@ -361,4 +372,3 @@ window.customCards.push({
   preview: true,
   documentationURL: 'https://github.com/TUO_USERNAME/tapparella-card',
 });
-
