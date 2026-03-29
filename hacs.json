@@ -1,0 +1,8 @@
+{
+  "name": "Tapparella Card",
+  "description": "Card per il controllo delle tapparelle con grafica animata, slider posizione e pulsanti Apri/Stop/Chiudi. Configurabile dall'UI di Home Assistant.",
+  "render_readme": true,
+  "filename": "tapparella-card.js",
+  "homeassistant": "2023.9.0",
+  "content_in_root": true
+}
