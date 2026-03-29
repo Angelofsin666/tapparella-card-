@@ -1,157 +1,115 @@
 /**
  * Tapparella Card — Custom card per Home Assistant
- * Versione: 1.0.0
+ * Versione: 1.1.0
  * Compatibile con HACS
  */
 
 // ─── EDITOR VISIVO ───────────────────────────────────────────────────────────
+// Usa ha-selector (componente nativo HA) invece di ha-entity-picker.
+// ha-selector riceve hass e selector come proprietà JS, non attributi HTML,
+// quindi vanno assegnati imperativamente dopo la creazione del nodo.
 class TapparellaCardEditor extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
     this._config = {};
-    this._built = false;
   }
 
   setConfig(config) {
     this._config = { ...config };
-    if (this._built) {
-      this._syncValues();
-    }
+    this._refresh();
   }
 
   set hass(hass) {
     this._hass = hass;
-    if (!this._built) {
-      this._build();
-    }
-    // Propaga hass agli entity-picker ogni volta
-    this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p => {
-      p.hass = hass;
-    });
+    this._refresh();
   }
 
-  _build() {
-    this._built = true;
+  _refresh() {
+    if (!this._hass || !this._config) return;
+
+    const c = this._config;
     const root = this.shadowRoot;
 
-    const style = document.createElement('style');
-    style.textContent = `
-      :host { display: block; }
-      .form { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; }
-      .section-title {
-        font-size: 11px; font-weight: 700; color: #9ca3af;
-        text-transform: uppercase; letter-spacing: 0.1em;
-        border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;
-        margin-top: 4px;
-      }
-      label {
-        font-size: 12px; font-weight: 600; color: #6b7280;
-        text-transform: uppercase; letter-spacing: 0.05em;
-        margin-bottom: 4px; display: block;
-      }
-      ha-entity-picker, ha-textfield { display: block; width: 100%; }
-      .color-row { display: flex; align-items: center; gap: 12px; }
-      .color-row input[type=color] {
-        width: 44px; height: 44px; border-radius: 12px;
-        border: 2px solid #e5e7eb; cursor: pointer;
-        padding: 2px; background: none;
-      }
-      .color-hint { font-size: 12px; color: #9ca3af; }
-    `;
-    root.appendChild(style);
+    // Costruisce il DOM solo la prima volta
+    if (!root.querySelector('.form')) {
+      root.innerHTML = `
+        <style>
+          :host { display: block; }
+          .form { display: flex; flex-direction: column; gap: 20px; padding: 4px 0; }
+          .section-title {
+            font-size: 11px; font-weight: 700; color: #9ca3af;
+            text-transform: uppercase; letter-spacing: 0.1em;
+            border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;
+          }
+          ha-selector { display: block; }
+          .color-wrap { display: flex; flex-direction: column; gap: 8px; }
+          .color-label { font-size: 12px; font-weight: 600; color: #374151; }
+          .color-row { display: flex; align-items: center; gap: 12px; }
+          input[type=color] {
+            width: 44px; height: 44px; border-radius: 12px;
+            border: 2px solid #e5e7eb; cursor: pointer;
+            padding: 2px; background: none;
+          }
+          .color-hint { font-size: 12px; color: #9ca3af; }
+        </style>
+        <div class="form">
+          <div class="section-title">Entità</div>
+          <ha-selector id="sel-entity"></ha-selector>
+          <ha-selector id="sel-energy"></ha-selector>
+          <div class="section-title">Aspetto</div>
+          <ha-selector id="sel-name"></ha-selector>
+          <div class="color-wrap">
+            <span class="color-label">Colore tema</span>
+            <div class="color-row">
+              <input type="color" id="color-input">
+              <span class="color-hint">Colore principale bottoni e icone</span>
+            </div>
+          </div>
+        </div>
+      `;
 
-    const form = document.createElement('div');
-    form.className = 'form';
+      root.getElementById('sel-entity').addEventListener('value-changed', e => {
+        e.stopPropagation();
+        this._changed('entity', e.detail.value);
+      });
+      root.getElementById('sel-energy').addEventListener('value-changed', e => {
+        e.stopPropagation();
+        this._changed('energy_entity', e.detail.value);
+      });
+      root.getElementById('sel-name').addEventListener('value-changed', e => {
+        e.stopPropagation();
+        this._changed('name', e.detail.value);
+      });
+      root.getElementById('color-input').addEventListener('input', e => {
+        this._changed('color', e.target.value);
+      });
+    }
 
-    // ── Sezione Entità ──
-    const secEntita = document.createElement('div');
-    secEntita.className = 'section-title';
-    secEntita.textContent = 'Entità';
-    form.appendChild(secEntita);
+    // Aggiorna le proprietà JS ad ogni refresh
+    const selEntity = root.getElementById('sel-entity');
+    selEntity.hass     = this._hass;
+    selEntity.selector = { entity: { domain: 'cover' } };
+    selEntity.value    = c.entity || '';
+    selEntity.label    = 'Cover (obbligatoria)';
+    selEntity.required = true;
 
-    // Cover picker
-    form.appendChild(this._makePickerField(
-      'Cover (obbligatoria)', 'entity', ['cover']
-    ));
+    const selEnergy = root.getElementById('sel-energy');
+    selEnergy.hass     = this._hass;
+    selEnergy.selector = { entity: { domain: 'sensor' } };
+    selEnergy.value    = c.energy_entity || '';
+    selEnergy.label    = 'Sensore Energia (opzionale)';
 
-    // Energia picker
-    form.appendChild(this._makePickerField(
-      'Sensore Energia (opzionale)', 'energy_entity', ['sensor']
-    ));
+    const selName = root.getElementById('sel-name');
+    selName.hass     = this._hass;
+    selName.selector = { text: {} };
+    selName.value    = c.name || '';
+    selName.label    = 'Nome stanza';
 
-    // ── Sezione Aspetto ──
-    const secAspetto = document.createElement('div');
-    secAspetto.className = 'section-title';
-    secAspetto.textContent = 'Aspetto';
-    form.appendChild(secAspetto);
-
-    // Nome stanza
-    const nomeWrap = document.createElement('div');
-    const nomeLabel = document.createElement('label');
-    nomeLabel.textContent = 'Nome stanza';
-    const nomeField = document.createElement('ha-textfield');
-    nomeField.setAttribute('placeholder', 'Es. Soggiorno');
-    nomeField.style.width = '100%';
-    nomeField.addEventListener('input', e => this._changed('name', e.target.value));
-    nomeField.addEventListener('change', e => this._changed('name', e.target.value));
-    this._nomeField = nomeField;
-    nomeWrap.appendChild(nomeLabel);
-    nomeWrap.appendChild(nomeField);
-    form.appendChild(nomeWrap);
-
-    // Colore
-    const colorWrap = document.createElement('div');
-    const colorLabel = document.createElement('label');
-    colorLabel.textContent = 'Colore tema';
-    const colorRow = document.createElement('div');
-    colorRow.className = 'color-row';
-    const colorInput = document.createElement('input');
-    colorInput.type = 'color';
-    colorInput.addEventListener('input', e => this._changed('color', e.target.value));
-    const colorHint = document.createElement('span');
-    colorHint.className = 'color-hint';
-    colorHint.textContent = 'Colore principale bottoni e icone';
-    colorRow.appendChild(colorInput);
-    colorRow.appendChild(colorHint);
-    this._colorInput = colorInput;
-    colorWrap.appendChild(colorLabel);
-    colorWrap.appendChild(colorRow);
-    form.appendChild(colorWrap);
-
-    root.appendChild(form);
-    this._syncValues();
-  }
-
-  _makePickerField(labelText, key, domains) {
-    const wrap = document.createElement('div');
-    const label = document.createElement('label');
-    label.textContent = labelText;
-
-    const picker = document.createElement('ha-entity-picker');
-    picker.setAttribute('allow-custom-entity', '');
-    picker.includeDomains = domains;
-    if (this._hass) picker.hass = this._hass;
-
-    picker.addEventListener('value-changed', e => {
-      this._changed(key, e.detail.value);
-    });
-
-    // Salva riferimento per sync
-    if (key === 'entity')        this._entityPicker = picker;
-    if (key === 'energy_entity') this._energyPicker = picker;
-
-    wrap.appendChild(label);
-    wrap.appendChild(picker);
-    return wrap;
-  }
-
-  _syncValues() {
-    const c = this._config || {};
-    if (this._entityPicker) this._entityPicker.value = c.entity || '';
-    if (this._energyPicker) this._energyPicker.value = c.energy_entity || '';
-    if (this._nomeField)    this._nomeField.value    = c.name  || '';
-    if (this._colorInput)   this._colorInput.value   = c.color || '#6366f1';
+    const colorInput = root.getElementById('color-input');
+    if (colorInput && document.activeElement !== colorInput) {
+      colorInput.value = c.color || '#6366f1';
+    }
   }
 
   _changed(key, value) {
@@ -182,7 +140,7 @@ class TapparellaCard extends HTMLElement {
 
   static getStubConfig() {
     return {
-      entity: 'cover.tapparella',
+      entity: '',
       energy_entity: '',
       name: 'Tapparella',
       color: '#6366f1',
@@ -200,7 +158,6 @@ class TapparellaCard extends HTMLElement {
     this._updateState();
   }
 
-  // ── helpers colore ──
   _hexToRgb(hex) {
     const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : '99,102,241';
@@ -211,7 +168,6 @@ class TapparellaCard extends HTMLElement {
     return `#${[mix(r),mix(g),mix(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}`;
   }
 
-  // ── SVG tapparella ──
   _buildSvg(pos, accent, light) {
     const numSlats = pos !== undefined ? Math.round((100 - pos) / 14) : 7;
     let slats = '';
@@ -242,7 +198,6 @@ class TapparellaCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; }
-
         ha-card {
           border-radius: 28px;
           background: #ffffff;
@@ -251,45 +206,22 @@ class TapparellaCard extends HTMLElement {
           overflow: hidden;
           font-family: var(--primary-font-family, sans-serif);
         }
-
-        /* ── Header ── */
-        .header {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 14px 16px 10px;
-        }
+        .header { display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; }
         .icon-wrap {
           width: 40px; height: 40px; border-radius: 12px;
           background: ${light};
-          display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0;
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
         .icon-wrap ha-icon { --mdc-icon-size: 22px; color: ${accent}; }
         .header-text { flex: 1; min-width: 0; }
         .room-name { font-size: 18px; font-weight: 600; color: #111827; line-height: 1.2; }
-        .energy {
-          font-size: 12px; color: ${accent}; font-weight: 500; margin-top: 2px;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-
-        /* ── Visual panel ── */
+        .energy { font-size: 12px; color: ${accent}; font-weight: 500; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .visual-panel {
-          background: ${light};
-          border-radius: 20px;
-          margin: 0 4px;
-          padding: 16px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          overflow: hidden;
+          background: ${light}; border-radius: 20px; margin: 0 4px; padding: 16px;
+          display: flex; align-items: center; justify-content: space-between; gap: 8px; overflow: hidden;
         }
         .pos-block { flex: 1; text-align: right; min-width: 0; padding-left: 12px; }
-        .pos-number {
-          font-size: 54px; font-weight: 300; color: ${accent};
-          line-height: 1; letter-spacing: -2px; white-space: nowrap;
-        }
+        .pos-number { font-size: 54px; font-weight: 300; color: ${accent}; line-height: 1; letter-spacing: -2px; white-space: nowrap; }
         .pos-label { font-size: 11px; color: #7b8094; margin-top: 4px; }
         .status-badge {
           display: inline-flex; align-items: center; margin-top: 10px;
@@ -297,80 +229,41 @@ class TapparellaCard extends HTMLElement {
           background: rgba(${rgb},0.18); color: ${accent};
           font-size: 11px; font-weight: 700; white-space: nowrap;
         }
-
-        /* ── Slider ── */
-        .slider-wrap {
-          padding: 12px 16px 4px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
+        .slider-wrap { padding: 12px 16px 4px; display: flex; align-items: center; gap: 10px; }
         .slider-wrap ha-icon { --mdc-icon-size: 18px; color: ${accent}; flex-shrink: 0; }
         input[type=range] {
-          flex: 1;
-          -webkit-appearance: none;
-          height: 6px;
-          border-radius: 3px;
-          background: ${light};
-          outline: none;
-          cursor: pointer;
+          flex: 1; -webkit-appearance: none; height: 6px; border-radius: 3px;
+          background: ${light}; outline: none; cursor: pointer;
         }
         input[type=range]::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          width: 20px; height: 20px; border-radius: 50%;
-          background: ${accent};
-          box-shadow: 0 2px 6px rgba(${rgb},0.4);
-          cursor: pointer;
-          transition: transform 0.15s;
+          -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+          background: ${accent}; box-shadow: 0 2px 6px rgba(${rgb},0.4);
+          cursor: pointer; transition: transform 0.15s;
         }
         input[type=range]::-webkit-slider-thumb:active { transform: scale(1.2); }
-
-        /* ── Pulsanti ── */
-        .buttons {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
-          gap: 6px;
-          padding: 8px;
-        }
+        .buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; padding: 8px; }
         .btn {
           display: flex; flex-direction: column; align-items: center;
-          justify-content: center; gap: 5px;
-          padding: 14px 4px;
-          border-radius: 16px;
-          border: 1.5px solid transparent;
-          cursor: pointer;
-          font-size: 11px; font-weight: 600;
-          transition: background 0.18s, box-shadow 0.18s, color 0.18s;
-          user-select: none;
+          justify-content: center; gap: 5px; padding: 14px 4px; border-radius: 16px;
+          border: 1.5px solid transparent; cursor: pointer; font-size: 11px; font-weight: 600;
+          transition: background 0.18s, box-shadow 0.18s, color 0.18s; user-select: none;
         }
         .btn ha-icon { --mdc-icon-size: 20px; transition: color 0.18s; }
-
         .btn-open  { background: #d1fae5; color: #10b981; border-color: #a7f3d0; }
         .btn-stop  { background: #fef3c7; color: #f59e0b; border-color: #fde68a; }
         .btn-close { background: ${light}; color: ${accent}; border-color: rgba(${rgb},0.3); }
-
         .btn-open:hover  { background: #10b981; color: white; box-shadow: 0 4px 14px rgba(16,185,129,0.35); border-color: transparent; }
-        .btn-stop:hover  { background: #f59e0b; color: white; box-shadow: 0 4px 14px rgba(245,158,11,0.35);  border-color: transparent; }
-        .btn-close:hover { background: ${accent}; color: white; box-shadow: 0 4px 14px rgba(${rgb},0.35);    border-color: transparent; }
-
-        .btn-open:hover  ha-icon, .btn-open:hover  span { color: white; }
-        .btn-stop:hover  ha-icon, .btn-stop:hover  span { color: white; }
-        .btn-close:hover ha-icon, .btn-close:hover span { color: white; }
+        .btn-stop:hover  { background: #f59e0b; color: white; box-shadow: 0 4px 14px rgba(245,158,11,0.35); border-color: transparent; }
+        .btn-close:hover { background: ${accent}; color: white; box-shadow: 0 4px 14px rgba(${rgb},0.35); border-color: transparent; }
       </style>
-
       <ha-card>
-        <!-- Header -->
         <div class="header">
-          <div class="icon-wrap">
-            <ha-icon icon="mdi:window-shutter"></ha-icon>
-          </div>
+          <div class="icon-wrap"><ha-icon icon="mdi:window-shutter"></ha-icon></div>
           <div class="header-text">
             <div class="room-name" id="room-name">${c.name || 'Tapparella'}</div>
             <div class="energy" id="energy-text">${c.energy_entity ? 'Energia: --' : ''}</div>
           </div>
         </div>
-
-        <!-- Pannello visivo -->
         <div class="visual-panel">
           <div id="svg-container"></div>
           <div class="pos-block">
@@ -379,28 +272,15 @@ class TapparellaCard extends HTMLElement {
             <div class="status-badge" id="status-badge">--</div>
           </div>
         </div>
-
-        <!-- Slider -->
         <div class="slider-wrap">
           <ha-icon icon="mdi:arrow-up-thin"></ha-icon>
           <input type="range" min="0" max="100" step="1" id="pos-slider" value="0"/>
           <ha-icon icon="mdi:arrow-down-thin"></ha-icon>
         </div>
-
-        <!-- Pulsanti -->
         <div class="buttons">
-          <div class="btn btn-open" id="btn-open">
-            <ha-icon icon="mdi:arrow-up-bold"></ha-icon>
-            <span>Apri</span>
-          </div>
-          <div class="btn btn-stop" id="btn-stop">
-            <ha-icon icon="mdi:stop"></ha-icon>
-            <span>Stop</span>
-          </div>
-          <div class="btn btn-close" id="btn-close">
-            <ha-icon icon="mdi:arrow-down-bold"></ha-icon>
-            <span>Chiudi</span>
-          </div>
+          <div class="btn btn-open" id="btn-open"><ha-icon icon="mdi:arrow-up-bold"></ha-icon><span>Apri</span></div>
+          <div class="btn btn-stop" id="btn-stop"><ha-icon icon="mdi:stop"></ha-icon><span>Stop</span></div>
+          <div class="btn btn-close" id="btn-close"><ha-icon icon="mdi:arrow-down-bold"></ha-icon><span>Chiudi</span></div>
         </div>
       </ha-card>
     `;
@@ -410,72 +290,47 @@ class TapparellaCard extends HTMLElement {
 
   _bindEvents(accent, light) {
     const root = this.shadowRoot;
+    root.getElementById('btn-open')?.addEventListener('click', () => this._callService('cover', 'open_cover'));
+    root.getElementById('btn-stop')?.addEventListener('click', () => this._callService('cover', 'stop_cover'));
+    root.getElementById('btn-close')?.addEventListener('click', () => this._callService('cover', 'close_cover'));
 
-    // Pulsanti
-    root.getElementById('btn-open')?.addEventListener('click', () => {
-      this._callService('cover', 'open_cover');
-    });
-    root.getElementById('btn-stop')?.addEventListener('click', () => {
-      this._callService('cover', 'stop_cover');
-    });
-    root.getElementById('btn-close')?.addEventListener('click', () => {
-      this._callService('cover', 'close_cover');
-    });
-
-    // Slider: aggiorna posizione al rilascio
     const slider = root.getElementById('pos-slider');
     let dragging = false;
-    slider?.addEventListener('mousedown', () => dragging = true);
-    slider?.addEventListener('touchstart', () => dragging = true);
-    slider?.addEventListener('mouseup', () => {
-      dragging = false;
-      this._callService('cover', 'set_cover_position', { position: parseInt(slider.value) });
-    });
-    slider?.addEventListener('touchend', () => {
-      dragging = false;
-      this._callService('cover', 'set_cover_position', { position: parseInt(slider.value) });
-    });
-    // Aggiorna numero live mentre si trascina
+    slider?.addEventListener('mousedown',  () => dragging = true);
+    slider?.addEventListener('touchstart', () => dragging = true, { passive: true });
+    slider?.addEventListener('mouseup',  () => { dragging = false; this._callService('cover', 'set_cover_position', { position: parseInt(slider.value) }); });
+    slider?.addEventListener('touchend', () => { dragging = false; this._callService('cover', 'set_cover_position', { position: parseInt(slider.value) }); });
     slider?.addEventListener('input', () => {
-      if (dragging) {
-        const pos = parseInt(slider.value);
-        const n = root.getElementById('pos-number');
-        if (n) n.textContent = pos + '%';
-        const svg = root.getElementById('svg-container');
-        if (svg) svg.innerHTML = this._buildSvg(pos, accent, light);
-      }
+      if (!dragging) return;
+      const pos = parseInt(slider.value);
+      const n = root.getElementById('pos-number');
+      if (n) n.textContent = pos + '%';
+      const svg = root.getElementById('svg-container');
+      if (svg) svg.innerHTML = this._buildSvg(pos, accent, light);
     });
   }
 
   _updateState() {
     if (!this._hass || !this._config?.entity) return;
     const root = this.shadowRoot;
-    if (!root.getElementById('pos-number')) return; // non ancora renderizzato
+    if (!root.getElementById('pos-number')) return;
 
     const accent = this._config.color || '#6366f1';
     const light  = this._lighten(accent);
-
-    // Cover
     const coverState = this._hass.states[this._config.entity];
-    const pos = coverState?.attributes?.current_position;
+    const pos    = coverState?.attributes?.current_position;
     const posText = pos !== undefined ? pos + '%' : '--';
     const stato   = pos === 100 ? 'Aperta' : pos === 0 ? 'Chiusa' : pos !== undefined ? 'Parziale' : '--';
 
     const posEl = root.getElementById('pos-number');
     if (posEl) posEl.textContent = posText;
-
     const badgeEl = root.getElementById('status-badge');
     if (badgeEl) badgeEl.textContent = stato;
-
     const svgEl = root.getElementById('svg-container');
     if (svgEl) svgEl.innerHTML = this._buildSvg(pos, accent, light);
-
     const slider = root.getElementById('pos-slider');
-    if (slider && pos !== undefined && !this._sliderDragging) {
-      slider.value = pos;
-    }
+    if (slider && pos !== undefined) slider.value = pos;
 
-    // Energia
     if (this._config.energy_entity) {
       const eState = this._hass.states[this._config.energy_entity];
       const eVal   = eState?.state ?? '--';
@@ -484,17 +339,13 @@ class TapparellaCard extends HTMLElement {
       if (eEl) eEl.textContent = `Energia: ${eVal} ${eUnit}`;
     }
 
-    // Nome (aggiornato live in caso di cambio config)
     const nameEl = root.getElementById('room-name');
     if (nameEl) nameEl.textContent = this._config.name || 'Tapparella';
   }
 
   _callService(domain, service, data = {}) {
     if (!this._hass || !this._config?.entity) return;
-    this._hass.callService(domain, service, {
-      entity_id: this._config.entity,
-      ...data,
-    });
+    this._hass.callService(domain, service, { entity_id: this._config.entity, ...data });
   }
 
   getCardSize() { return 4; }
@@ -502,7 +353,6 @@ class TapparellaCard extends HTMLElement {
 
 customElements.define('tapparella-card', TapparellaCard);
 
-// Registrazione per HACS / HA dashboard picker
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'tapparella-card',
@@ -511,3 +361,4 @@ window.customCards.push({
   preview: true,
   documentationURL: 'https://github.com/TUO_USERNAME/tapparella-card',
 });
+
