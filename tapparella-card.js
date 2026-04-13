@@ -172,19 +172,19 @@ class TapparellaCard extends HTMLElement {
     let slats = '';
     for (let i = 0; i < numSlats; i++) {
       const op = Math.max(0.15, 0.8 - i * 0.08).toFixed(2);
-      slats += `<rect x="14" y="${14 + i * 8}" width="62" height="5" rx="2" fill="${accent}" opacity="${op}"/>`;
+      slats += `<rect x="12" y="${10 + i * 8}" width="66" height="5" rx="2" fill="${accent}" opacity="${op}"/>`;
     }
     const sky = pos > 0
-      ? `<rect x="14" y="14" width="62" height="${Math.round(pos * 0.6)}" rx="4" fill="#e0f2fe" opacity="0.9"/>`
+      ? `<rect x="12" y="10" width="66" height="${Math.round(pos * 0.55)}" rx="4" fill="#e0f2fe" opacity="0.9"/>`
       : '';
     const sun = pos === 100
-      ? `<circle cx="65" cy="28" r="8" fill="#fef08a" opacity="0.8"/>`
+      ? `<circle cx="68" cy="22" r="8" fill="#fef08a" opacity="0.8"/>`
       : '';
     return `
-      <svg width="110" height="114" viewBox="0 0 90 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;overflow:visible">
-        <rect x="8" y="8" width="74" height="74" rx="8" fill="white" stroke="${light}" stroke-width="2"/>
+      <svg width="106" height="106" viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;display:block">
+        <rect x="6" y="4" width="78" height="72" rx="8" fill="white" stroke="${light}" stroke-width="2"/>
         ${sky}${sun}${slats}
-        <rect x="8" y="74" width="74" height="8" rx="4" fill="${light}"/>
+        <rect x="6" y="72" width="78" height="8" rx="4" fill="${light}"/>
       </svg>`;
   }
 
@@ -201,10 +201,9 @@ class TapparellaCard extends HTMLElement {
           border-radius: 28px;
           background: #ffffff;
           box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 12px 40px rgba(0,0,0,0.08);
-          padding: 4px;
-          padding-bottom: 8px;
-          overflow: visible;
+          padding: 4px 4px 8px;
           font-family: var(--primary-font-family, sans-serif);
+          --ha-card-border-radius: 28px;
         }
         .header { display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; }
         .icon-wrap {
