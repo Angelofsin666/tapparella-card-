@@ -181,7 +181,7 @@ class TapparellaCard extends HTMLElement {
       ? `<circle cx="65" cy="28" r="8" fill="#fef08a" opacity="0.8"/>`
       : '';
     return `
-      <svg width="100" height="100" viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+      <svg width="110" height="114" viewBox="0 0 90 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;overflow:visible">
         <rect x="8" y="8" width="74" height="74" rx="8" fill="white" stroke="${light}" stroke-width="2"/>
         ${sky}${sun}${slats}
         <rect x="8" y="74" width="74" height="8" rx="4" fill="${light}"/>
@@ -202,7 +202,8 @@ class TapparellaCard extends HTMLElement {
           background: #ffffff;
           box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 12px 40px rgba(0,0,0,0.08);
           padding: 4px;
-          overflow: hidden;
+          padding-bottom: 8px;
+          overflow: visible;
           font-family: var(--primary-font-family, sans-serif);
         }
         .header { display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; }
