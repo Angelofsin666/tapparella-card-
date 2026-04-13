@@ -217,8 +217,10 @@ class TapparellaCard extends HTMLElement {
         .energy { font-size: 12px; color: ${accent}; font-weight: 500; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .visual-panel {
           background: ${light}; border-radius: 20px; margin: 0 4px; padding: 16px;
-          display: flex; align-items: center; justify-content: space-between; gap: 8px; overflow: hidden;
+          display: flex; align-items: center; justify-content: space-between; gap: 8px;
+          min-height: 130px; overflow: visible;
         }
+        #svg-container { flex-shrink: 0; display: flex; align-items: center; }
         .pos-block { flex: 1; text-align: right; min-width: 0; padding-left: 12px; }
         .pos-number { font-size: 54px; font-weight: 300; color: ${accent}; line-height: 1; letter-spacing: -2px; white-space: nowrap; }
         .pos-label { font-size: 11px; color: #7b8094; margin-top: 4px; }
